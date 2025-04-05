@@ -9,6 +9,7 @@ import sys
 from typing import Any
 from typing import Optional
 from typing import Tuple
+import hashlib
 
 import pexpect
 import pytest
@@ -20,6 +21,7 @@ except ModuleNotFoundError:
     idf_path = os.environ['IDF_PATH']
     sys.path.insert(0, idf_path + '/tools/ci/python_packages')
     from common_test_methods import get_env_config_variable, get_host_ip4_by_dest_ip
+
 
 server_cert = '-----BEGIN CERTIFICATE-----\n' \
               'MIIDWDCCAkACCQCbF4+gVh/MLjANBgkqhkiG9w0BAQsFADBuMQswCQYDVQQGEwJJ\n'\
@@ -78,17 +80,17 @@ OTA_1_ADDRESS = '0x1d0000'
 def start_https_server(ota_image_dir: str, server_ip: str, server_port: int, server_file: Optional[str] = None, key_file: Optional[str] = None) -> None:
     os.chdir(ota_image_dir)
 
-    if server_file is None:
-        server_file = os.path.join(ota_image_dir, 'server_cert.pem')
-        cert_file_handle = open(server_file, 'w+', encoding='utf-8')
-        cert_file_handle.write(server_cert)
-        cert_file_handle.close()
+    # if server_file is None:
+    #     server_file = os.path.join(ota_image_dir, 'server_cert.pem')
+    #     cert_file_handle = open(server_file, 'w+', encoding='utf-8')
+    #     cert_file_handle.write(server_cert)
+    #     cert_file_handle.close()
 
-    if key_file is None:
-        key_file = os.path.join(ota_image_dir, 'server_key.pem')
-        key_file_handle = open('server_key.pem', 'w+', encoding='utf-8')
-        key_file_handle.write(server_key)
-        key_file_handle.close()
+    # if key_file is None:
+    #     key_file = os.path.join(ota_image_dir, 'server_key.pem')
+    #     key_file_handle = open('server_key.pem', 'w+', encoding='utf-8')
+    #     key_file_handle.write(server_key)
+    #     key_file_handle.close()
 
     httpd = http.server.HTTPServer((server_ip, server_port), http.server.SimpleHTTPRequestHandler)
 
@@ -126,10 +128,10 @@ def check_sha256(sha256_expected: str, sha256_reported: str) -> None:
 
 def calc_all_sha256(dut: Dut) -> Tuple[str, str]:
     bootloader_path = os.path.join(dut.app.binary_path, 'bootloader', 'bootloader.bin')
-    sha256_bootloader = dut.app.get_sha256(bootloader_path)
+    sha256_bootloader = calculate_sha256(bootloader_path)
 
-    app_path = os.path.join(dut.app.binary_path, 'simple_ota.bin')
-    sha256_app = dut.app.get_sha256(app_path)
+    app_path = os.path.join(dut.app.binary_path, 'MQTT_PowerMeter.bin')
+    sha256_app = calculate_sha256(app_path)
 
     return str(sha256_bootloader), str(sha256_app)
 
@@ -148,6 +150,14 @@ def setting_connection(dut: Dut, env_name: Optional[str] = None) -> Any:
     return get_host_ip4_by_dest_ip(ip_address)
 
 
+def calculate_sha256(file_path):
+    with open(file_path, 'rb') as f:
+        sha256 = hashlib.sha256()
+        while chunk := f.read(4096):
+            sha256.update(chunk)
+        return sha256.hexdigest()
+
+
 @pytest.mark.esp32
 @pytest.mark.esp32c3
 @pytest.mark.esp32s3
@@ -161,7 +171,14 @@ def test_examples_protocol_simple_ota_example(dut: Dut) -> None:
     """
     sha256_bootloader, sha256_app = calc_all_sha256(dut)
     # Start server
-    thread1 = multiprocessing.Process(target=start_https_server, args=(dut.app.binary_path, '0.0.0.0', 8000))
+    certs_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "certs")
+    thread1 = multiprocessing.Process(target=start_https_server, args=(
+        dut.app.binary_path, 
+        '0.0.0.0', 
+        8070, 
+        os.path.join(certs_dir, 'ca_cert.pem'), 
+        os.path.join(certs_dir, 'ca_key.pem')
+    ))
     thread1.daemon = True
     thread1.start()
     try:
@@ -182,187 +199,6 @@ def test_examples_protocol_simple_ota_example(dut: Dut) -> None:
     finally:
         thread1.terminate()
 
-
-@pytest.mark.esp32
-@pytest.mark.ethernet_ota
-@pytest.mark.parametrize('config', ['spiram',], indirect=True)
-def test_examples_protocol_simple_ota_example_ethernet_with_spiram_config(dut: Dut) -> None:
-    """
-    steps: |
-      1. join AP/Ethernet
-      2. Fetch OTA image over HTTPS
-      3. Reboot with the new OTA image
-    """
-    # Start server
-    thread1 = multiprocessing.Process(target=start_https_server, args=(dut.app.binary_path, '0.0.0.0', 8000))
-    thread1.daemon = True
-    thread1.start()
-    try:
-        # start test
-        dut.expect(f'Loaded app from partition at offset {OTA_0_ADDRESS}', timeout=30)
-        host_ip = setting_connection(dut)
-        dut.expect('Starting OTA example task', timeout=30)
-        print(f'writing to device: https://{host_ip}:8000/simple_ota.bin')
-        dut.write(f'https://{host_ip}:8000/simple_ota.bin')
-        dut.expect('OTA Succeed, Rebooting...', timeout=60)
-        # after reboot
-        dut.expect(f'Loaded app from partition at offset {OTA_1_ADDRESS}', timeout=30)
-        dut.expect('OTA example app_main start', timeout=10)
-    finally:
-        thread1.terminate()
-
-
-@pytest.mark.esp32
-@pytest.mark.esp32c3
-@pytest.mark.flash_encryption_wifi_high_traffic
-@pytest.mark.nightly_run
-@pytest.mark.parametrize('config', ['flash_enc_wifi',], indirect=True)
-@pytest.mark.parametrize('skip_autoflash', ['y'], indirect=True)
-def test_examples_protocol_simple_ota_example_with_flash_encryption_wifi(dut: Dut) -> None:
-    """
-    steps: |
-      1. join AP/Ethernet
-      2. Fetch OTA image over HTTPS
-      3. Reboot with the new OTA image
-    """
-    # CONFIG_PARTITION_TABLE_TWO_OTA_ENCRYPTED_NVS==y, it includes partitions_two_ota_encr_nvs.csv
-    FACTORY_ADDRESS = '0x20000'
-    OTA_0_ADDRESS = '0x120000'
-    # OTA_1_ADDRESS = '0x220000'
-
-    # start test
-    # Erase flash
-    dut.serial.erase_flash()
-    dut.serial.flash()
-    # Start server
-    thread1 = multiprocessing.Process(target=start_https_server, args=(dut.app.binary_path, '0.0.0.0', 8000))
-    thread1.daemon = True
-    thread1.start()
-    try:
-        dut.expect(f'Loaded app from partition at offset {FACTORY_ADDRESS}', timeout=30)
-        dut.expect('Flash encryption mode is DEVELOPMENT', timeout=10)
-        # Parse IP address of STA
-        env_name = 'flash_encryption_wifi_high_traffic' if dut.app.sdkconfig.get('EXAMPLE_WIFI_SSID_PWD_FROM_STDIN') is True else None
-        host_ip = setting_connection(dut, env_name)
-
-        dut.expect('Starting OTA example task', timeout=30)
-        print(f'writing to device: https://{host_ip}:8000/simple_ota.bin')
-        dut.write(f'https://{host_ip}:8000/simple_ota.bin')
-        dut.expect('OTA Succeed, Rebooting...', timeout=60)
-        # after reboot
-        dut.expect(f'Loaded app from partition at offset {OTA_0_ADDRESS}', timeout=30)
-        dut.expect('Flash encryption mode is DEVELOPMENT', timeout=10)
-        dut.expect('OTA example app_main start', timeout=10)
-    finally:
-        thread1.terminate()
-
-
-@pytest.mark.esp32
-@pytest.mark.ethernet_ota
-@pytest.mark.parametrize('config', ['on_update_no_sb_ecdsa',], indirect=True)
-def test_examples_protocol_simple_ota_example_with_verify_app_signature_on_update_no_secure_boot_ecdsa(dut: Dut) -> None:
-    """
-    steps: |
-      1. join AP/Ethernet
-      2. Fetch OTA image over HTTPS
-      3. Reboot with the new OTA image
-    """
-    sha256_bootloader, sha256_app = calc_all_sha256(dut)
-    # Start server
-    thread1 = multiprocessing.Process(target=start_https_server, args=(dut.app.binary_path, '0.0.0.0', 8000))
-    thread1.daemon = True
-    thread1.start()
-    try:
-        # start test
-        dut.expect(f'Loaded app from partition at offset {OTA_0_ADDRESS}', timeout=30)
-        check_sha256(sha256_bootloader, str(dut.expect(r'SHA-256 for bootloader:\s+([a-f0-9]){64}')[0]))
-        check_sha256(sha256_app, str(dut.expect(r'SHA-256 for current firmware:\s+([a-f0-9]){64}')[0]))
-
-        host_ip = setting_connection(dut)
-
-        dut.expect('Starting OTA example task', timeout=30)
-        print(f'writing to device: https://{host_ip}:8000/simple_ota.bin')
-        dut.write(f'https://{host_ip}:8000/simple_ota.bin')
-        dut.expect(f'Writing to <ota_1> partition at offset {OTA_1_ADDRESS}', timeout=20)
-        dut.expect('Verifying image signature...', timeout=60)
-        dut.expect('OTA Succeed, Rebooting...', timeout=60)
-        # after reboot
-        dut.expect(f'Loaded app from partition at offset {OTA_1_ADDRESS}', timeout=20)
-        dut.expect('OTA example app_main start', timeout=10)
-    finally:
-        thread1.terminate()
-
-
-@pytest.mark.esp32
-@pytest.mark.ethernet_ota
-@pytest.mark.parametrize('config', ['on_update_no_sb_rsa',], indirect=True)
-def test_examples_protocol_simple_ota_example_with_verify_app_signature_on_update_no_secure_boot_rsa(dut: Dut) -> None:
-    """
-    steps: |
-      1. join AP/Ethernet
-      2. Fetch OTA image over HTTPS
-      3. Reboot with the new OTA image
-    """
-    sha256_bootloader, sha256_app = calc_all_sha256(dut)
-    # Start server
-    thread1 = multiprocessing.Process(target=start_https_server, args=(dut.app.binary_path, '0.0.0.0', 8000))
-    thread1.daemon = True
-    thread1.start()
-    try:
-        # start test
-        dut.expect(f'Loaded app from partition at offset {OTA_0_ADDRESS}', timeout=30)
-        check_sha256(sha256_bootloader, str(dut.expect(r'SHA-256 for bootloader:\s+([a-f0-9]){64}')[0]))
-        check_sha256(sha256_app, str(dut.expect(r'SHA-256 for current firmware:\s+([a-f0-9]){64}')[0]))
-
-        host_ip = setting_connection(dut)
-
-        dut.expect('Starting OTA example task', timeout=30)
-        print(f'writing to device: https://{host_ip}:8000/simple_ota.bin')
-        dut.write(f'https://{host_ip}:8000/simple_ota.bin')
-        dut.expect(f'Writing to <ota_1> partition at offset {OTA_1_ADDRESS}', timeout=20)
-        dut.expect('Verifying image signature...', timeout=60)
-        dut.expect('#0 app key digest == #0 trusted key digest', timeout=10)
-        dut.expect('Verifying with RSA-PSS...', timeout=10)
-        dut.expect('Signature verified successfully!', timeout=10)
-        dut.expect('OTA Succeed, Rebooting...', timeout=60)
-        # after reboot
-        dut.expect(f'Loaded app from partition at offset {OTA_1_ADDRESS}', timeout=20)
-        dut.expect('OTA example app_main start', timeout=10)
-    finally:
-        thread1.terminate()
-
-
-@pytest.mark.esp32
-@pytest.mark.ethernet_ota
-@pytest.mark.parametrize('config', ['tls1_3',], indirect=True)
-def test_examples_protocol_simple_ota_example_tls1_3(dut: Dut) -> None:
-    """
-    steps: |
-      1. join AP/Ethernet
-      2. Fetch OTA image over HTTPS
-      3. Reboot with the new OTA image
-    """
-    sha256_bootloader, sha256_app = calc_all_sha256(dut)
-    # Start server
-    tls1_3_server = start_tls1_3_server(dut.app.binary_path, 8000)
-    try:
-        # start test
-        dut.expect(f'Loaded app from partition at offset {OTA_0_ADDRESS}', timeout=30)
-        check_sha256(sha256_bootloader, str(dut.expect(r'SHA-256 for bootloader:\s+([a-f0-9]){64}')[0]))
-        check_sha256(sha256_app, str(dut.expect(r'SHA-256 for current firmware:\s+([a-f0-9]){64}')[0]))
-        # Parse IP address of STA
-        env_name = 'wifi_high_traffic' if dut.app.sdkconfig.get('EXAMPLE_WIFI_SSID_PWD_FROM_STDIN') is True else None
-        host_ip = setting_connection(dut, env_name)
-
-        dut.expect('Starting OTA example task', timeout=30)
-        print(f'writing to device: https://{host_ip}:8000/simple_ota.bin')
-        dut.write(f'https://{host_ip}:8000/simple_ota.bin')
-        dut.expect('OTA Succeed, Rebooting...', timeout=120)
-        # after reboot
-        dut.expect(f'Loaded app from partition at offset {OTA_1_ADDRESS}', timeout=30)
-        dut.expect('OTA example app_main start', timeout=10)
-    finally:
-        tls1_3_server.kill()
 
 
 if __name__ == '__main__':

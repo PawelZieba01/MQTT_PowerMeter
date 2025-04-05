@@ -96,29 +96,11 @@ static void ota_example_task(void *pvParameter)
              running->type, running->subtype, running->address);
 
     esp_http_client_config_t config = {
-        .url = CONFIG_EXAMPLE_FIRMWARE_UPG_URL,
+        .url = CONFIG_FIRMWARE_UPG_URL,
         .cert_pem = (char *)server_cert_pem_start,
         .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,
     };
-
-#ifdef CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL_FROM_STDIN
-    char url_buf[OTA_URL_SIZE];
-    if (strcmp(config.url, "FROM_STDIN") == 0) {
-        example_configure_stdin_stdout();
-        fgets(url_buf, OTA_URL_SIZE, stdin);
-        int len = strlen(url_buf);
-        url_buf[len - 1] = '\0';
-        config.url = url_buf;
-    } else {
-        ESP_LOGE(TAG, "Configuration mismatch: wrong firmware upgrade image url");
-        abort();
-    }
-#endif
-
-#ifdef CONFIG_EXAMPLE_SKIP_COMMON_NAME_CHECK
-    config.skip_cert_common_name_check = true;
-#endif
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL) {
@@ -176,13 +158,13 @@ static void ota_example_task(void *pvParameter)
                             infinite_loop();
                         }
                     }
-#ifndef CONFIG_EXAMPLE_SKIP_VERSION_CHECK
+                    
+                    // check current version with running partition
                     if (memcmp(new_app_info.version, running_app_info.version, sizeof(new_app_info.version)) == 0) {
                         ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
                         http_cleanup(client);
                         infinite_loop();
                     }
-#endif
 
                     image_header_was_checked = true;
 

@@ -2,9 +2,9 @@ menu "Example Configuration"
 
     orsource "$IDF_PATH/examples/common_components/env_caps/$IDF_TARGET/Kconfig.env_caps"
 
-    config EXAMPLE_FIRMWARE_UPG_URL
+    config FIRMWARE_UPG_URL
         string "Firmware Upgrade URL"
-        default "https://192.168.2.106:8070/hello_world.bin"
+        default "https://192.168.0.104:8070/MQTT_PowerMeter.bin"
         help
             URL of server which hosts the firmware image.
 
