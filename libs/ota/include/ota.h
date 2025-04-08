@@ -1,6 +1,9 @@
 #ifndef OTA_H
 #define OTA_H
 
-void ota_task(void *pvParameter);
+#include "esp_err.h"
+
+esp_err_t ota_update(void);
+void ota_init(void);
 
 #endif // OTA_H

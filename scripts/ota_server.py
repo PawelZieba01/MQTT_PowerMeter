@@ -61,6 +61,27 @@ server_key = '-----BEGIN PRIVATE KEY-----\n'\
 OTA_0_ADDRESS = '0x20000'
 OTA_1_ADDRESS = '0x1d0000'
 
+class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # Sprawdź, czy w URL wpisano "MQTT_PowerMeter.bin"
+        if self.path != "/MQTT_PowerMeter.bin":
+            self.send_error(404, "File not found")
+            return
+        
+        # Wyszukaj plik z rozszerzeniem .bin w bieżącym katalogu
+        bin_files = [f for f in os.listdir('.') if f.endswith('.bin')]
+        print(f"Found bin files: {bin_files}")
+        if not bin_files:
+            self.send_error(404, "No .bin file found")
+            return
+
+        # Zakładamy, że w katalogu jest tylko jeden plik .bin
+        bin_file = bin_files[0]
+
+        # Ustaw ścieżkę na znaleziony plik .bin
+        self.path = f"/{bin_file}"
+        return super().do_GET()
+
 
 def start_https_server(ota_image_dir: str, server_ip: str, server_port: int, server_file: Optional[str] = None, key_file: Optional[str] = None) -> None:
     os.chdir(ota_image_dir)
@@ -77,7 +98,7 @@ def start_https_server(ota_image_dir: str, server_ip: str, server_port: int, ser
         key_file_handle.write(server_key)
         key_file_handle.close()
 
-    httpd = http.server.HTTPServer((server_ip, server_port), http.server.SimpleHTTPRequestHandler)
+    httpd = http.server.HTTPServer((server_ip, server_port), CustomHTTPRequestHandler)
 
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ssl_context.load_cert_chain(certfile=server_file, keyfile=key_file)
