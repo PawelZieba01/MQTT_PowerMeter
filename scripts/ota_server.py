@@ -87,17 +87,23 @@ def start_https_server(ota_image_dir: str, server_ip: str, server_port: int, ser
 
 
 if __name__ == '__main__':
-    if sys.argv[2:]:    # if two or more arguments provided:
-        # Usage: pytest_simple_ota.py <image_dir> <server_port> [cert_dir]
-        this_dir = os.path.dirname(os.path.realpath(__file__))
-        bin_dir = os.path.join(this_dir, sys.argv[1])
-        port = int(sys.argv[2])
-        cert_dir = bin_dir if not sys.argv[3:] else os.path.join(this_dir, sys.argv[3])  # optional argument
-        print(f'Starting HTTPS server at "https://0.0.0.0:{port}"')
-        start_https_server(bin_dir, '', port,
-                           server_file=os.path.join(cert_dir, 'ca_cert.pem'),
-                           key_file=os.path.join(cert_dir, 'ca_key.pem'))
-    else:
-        print('Usage: pytest_simple_ota.py <image_dir> <server_port> [cert_dir]')
-        print('Example: pytest_simple_ota.py /path/to/ota_image 8070 /path/to/cert_dir')
-        sys.exit(1)
+    try:
+        if sys.argv[2:]:    # if two or more arguments provided:
+            # Usage: pytest_simple_ota.py <image_dir> <server_port> [cert_dir]
+            this_dir = os.path.dirname(os.path.realpath(__file__))
+            bin_dir = os.path.join(this_dir, sys.argv[1])
+            port = int(sys.argv[2])
+            cert_dir = bin_dir if not sys.argv[3:] else os.path.join(this_dir, sys.argv[3])  # optional argument
+            print(f'Starting HTTPS server at "https://0.0.0.0:{port}"')
+
+            start_https_server(bin_dir, '', port,
+                            server_file=os.path.join(cert_dir, 'ca_cert.pem'),
+                            key_file=os.path.join(cert_dir, 'ca_key.pem'))
+            
+        else:
+            print('Usage: pytest_simple_ota.py <image_dir> <server_port> [cert_dir]')
+            print('Example: pytest_simple_ota.py /path/to/ota_image 8070 /path/to/cert_dir')
+            sys.exit(1)
+    except KeyboardInterrupt:  # Ctrl+C to exit
+        print('Exiting HTTPS server...')
+        sys.exit(0)

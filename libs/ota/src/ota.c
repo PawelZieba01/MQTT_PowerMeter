@@ -1,11 +1,5 @@
-/* OTA example
+#include "ota.h"
 
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <string.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
@@ -23,27 +17,27 @@
 #include "driver/gpio.h"
 #include "protocol_examples_common.h"
 #include "errno.h"
-
-#if CONFIG_EXAMPLE_CONNECT_WIFI
 #include "esp_wifi.h"
-#endif
+
+static const char *TAG = "ota";
 
 #define BUFFSIZE 1024
 #define HASH_LEN 32 /* SHA-256 digest length */
 
-static const char *TAG = "native_ota_example";
 /*an ota data write buffer ready to write to the flash*/
 static char ota_write_data[BUFFSIZE + 1] = { 0 };
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
-#define OTA_URL_SIZE 256
+
 
 static void http_cleanup(esp_http_client_handle_t client)
 {
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
 }
+
+
 
 static void __attribute__((noreturn)) task_fatal_error(void)
 {
@@ -54,6 +48,8 @@ static void __attribute__((noreturn)) task_fatal_error(void)
         ;
     }
 }
+
+
 
 static void print_sha256 (const uint8_t *image_hash, const char *label)
 {
@@ -74,15 +70,74 @@ static void infinite_loop(void)
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
+   
 
-static void ota_example_task(void *pvParameter)
+
+static void ota_init() 
+{
+    ESP_LOGI(TAG, "OTA init start");
+
+    uint8_t sha_256[HASH_LEN] = { 0 };
+    esp_partition_t partition;
+
+    // get sha256 digest for the partition table
+    partition.address   = ESP_PARTITION_TABLE_OFFSET;
+    partition.size      = ESP_PARTITION_TABLE_MAX_LEN;
+    partition.type      = ESP_PARTITION_TYPE_DATA;
+    esp_partition_get_sha256(&partition, sha_256);
+    print_sha256(sha_256, "SHA-256 for the partition table: ");
+
+    // get sha256 digest for bootloader
+    partition.address   = ESP_BOOTLOADER_OFFSET;
+    partition.size      = ESP_PARTITION_TABLE_OFFSET;
+    partition.type      = ESP_PARTITION_TYPE_APP;
+    esp_partition_get_sha256(&partition, sha_256);
+    print_sha256(sha_256, "SHA-256 for bootloader: ");
+
+    // get sha256 digest for running partition
+    esp_partition_get_sha256(esp_ota_get_running_partition(), sha_256);
+    print_sha256(sha_256, "SHA-256 for current firmware: ");
+
+    esp_ota_mark_app_valid_cancel_rollback();
+ 
+    // Initialize NVS.
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        // OTA app partition table has a smaller NVS partition size than the non-OTA
+        // partition table. This size mismatch may cause NVS initialization to fail.
+        // If this happens, we erase NVS partition and initialize NVS again.
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
+     * Read "Establishing Wi-Fi or Ethernet Connection" section in
+     * examples/protocols/README.md for more information about this function.
+     */
+    ESP_ERROR_CHECK(example_connect());
+    
+    /* Ensure to disable any WiFi power save mode, this allows best throughput
+     * and hence timings for overall OTA operation.
+     */
+    esp_wifi_set_ps(WIFI_PS_NONE);
+}
+
+
+
+void ota_task(void *pvParameter)
 {
     esp_err_t err;
     /* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
     esp_ota_handle_t update_handle = 0 ;
     const esp_partition_t *update_partition = NULL;
 
-    ESP_LOGI(TAG, "Starting OTA example task");
+    ESP_LOGI(TAG, "Starting OTA task");
+    
+    ota_init();
 
     const esp_partition_t *configured = esp_ota_get_boot_partition();
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -98,7 +153,7 @@ static void ota_example_task(void *pvParameter)
     esp_http_client_config_t config = {
         .url = CONFIG_FIRMWARE_UPG_URL,
         .cert_pem = (char *)server_cert_pem_start,
-        .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
+        .timeout_ms = CONFIG_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,
     };
 
@@ -234,94 +289,4 @@ static void ota_example_task(void *pvParameter)
     ESP_LOGI(TAG, "Prepare to restart system!");
     esp_restart();
     return ;
-}
-
-static bool diagnostic(void)
-{
-    gpio_config_t io_conf;
-    io_conf.intr_type    = GPIO_INTR_DISABLE;
-    io_conf.mode         = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL << CONFIG_EXAMPLE_GPIO_DIAGNOSTIC);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
-    gpio_config(&io_conf);
-
-    ESP_LOGI(TAG, "Diagnostics (5 sec)...");
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-    bool diagnostic_is_ok = gpio_get_level(CONFIG_EXAMPLE_GPIO_DIAGNOSTIC);
-
-    gpio_reset_pin(CONFIG_EXAMPLE_GPIO_DIAGNOSTIC);
-    return diagnostic_is_ok;
-}
-
-void app_main(void)
-{
-    ESP_LOGI(TAG, "OTA example app_main start");
-
-    uint8_t sha_256[HASH_LEN] = { 0 };
-    esp_partition_t partition;
-
-    // get sha256 digest for the partition table
-    partition.address   = ESP_PARTITION_TABLE_OFFSET;
-    partition.size      = ESP_PARTITION_TABLE_MAX_LEN;
-    partition.type      = ESP_PARTITION_TYPE_DATA;
-    esp_partition_get_sha256(&partition, sha_256);
-    print_sha256(sha_256, "SHA-256 for the partition table: ");
-
-    // get sha256 digest for bootloader
-    partition.address   = ESP_BOOTLOADER_OFFSET;
-    partition.size      = ESP_PARTITION_TABLE_OFFSET;
-    partition.type      = ESP_PARTITION_TYPE_APP;
-    esp_partition_get_sha256(&partition, sha_256);
-    print_sha256(sha_256, "SHA-256 for bootloader: ");
-
-    // get sha256 digest for running partition
-    esp_partition_get_sha256(esp_ota_get_running_partition(), sha_256);
-    print_sha256(sha_256, "SHA-256 for current firmware: ");
-
-    const esp_partition_t *running = esp_ota_get_running_partition();
-    esp_ota_img_states_t ota_state;
-    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            // run diagnostic function ...
-            bool diagnostic_is_ok = diagnostic();
-            if (diagnostic_is_ok) {
-                ESP_LOGI(TAG, "Diagnostics completed successfully! Continuing execution ...");
-                esp_ota_mark_app_valid_cancel_rollback();
-            } else {
-                ESP_LOGE(TAG, "Diagnostics failed! Start rollback to the previous version ...");
-                esp_ota_mark_app_invalid_rollback_and_reboot();
-            }
-        }
-    }
-
-    // Initialize NVS.
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // OTA app partition table has a smaller NVS partition size than the non-OTA
-        // partition table. This size mismatch may cause NVS initialization to fail.
-        // If this happens, we erase NVS partition and initialize NVS again.
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( err );
-
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
-     * Read "Establishing Wi-Fi or Ethernet Connection" section in
-     * examples/protocols/README.md for more information about this function.
-     */
-    ESP_ERROR_CHECK(example_connect());
-
-#if CONFIG_EXAMPLE_CONNECT_WIFI
-    /* Ensure to disable any WiFi power save mode, this allows best throughput
-     * and hence timings for overall OTA operation.
-     */
-    esp_wifi_set_ps(WIFI_PS_NONE);
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
-
-    xTaskCreate(&ota_example_task, "ota_example_task", 8192, NULL, 5, NULL);
 }

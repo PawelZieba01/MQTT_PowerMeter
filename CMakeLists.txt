@@ -2,11 +2,21 @@
 # in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
+# Buid options
 option(COPY_BINARIES "Włącz kopiowanie .bin po buildzie" OFF)
+
+# Components
+include_directories($ENV{IDF_PATH}/components)
+set(EXTRA_COMPONENT_DIRS 
+    "${CMAKE_SOURCE_DIR}/libs" 
+    "$ENV{IDF_PATH}/components")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(MQTT_PowerMeter)
 
+
+
+# Copy .bin to ota_image directory after build
 if(COPY_BINARIES)
     message(STATUS "📦 Kopiowanie .bin po kompilacji jest WŁĄCZONE")
 
