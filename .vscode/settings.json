@@ -4,11 +4,11 @@
     "idf.toolsPathWin": "C:\\Users\\Pawel\\.espressif",
     "idf.pythonInstallPath": "C:\\Users\\Pawel\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
     "idf.customExtraVars": {
-        "IDF_TARGET": "esp32c3"
+        "IDF_TARGET": "esp32"
     },
     "idf.openOcdConfigs": [
-        "board/esp32c3-builtin.cfg"
+        "board/esp32-wrover-kit-3.3v.cfg"
     ],
-    "idf.portWin": "COM14",
+    "idf.portWin": "COM13",
     "idf.flashType": "UART"
 }
