@@ -12,6 +12,7 @@
 
 #include "ota.h"
 #include "wifi.h"
+#include "mqtt_tcp.h"
 
 
 static const char *TAG = "main_app";
