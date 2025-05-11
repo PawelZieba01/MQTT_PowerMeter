@@ -17,6 +17,8 @@
 
 static const char *TAG = "main_app";
 
+static esp_mqtt_client_handle_t mqtt_client;
+
 
 void app_main(void)
 {
@@ -44,12 +46,17 @@ void app_main(void)
     }
 #endif
 
+    // Initialize MQTT.
+    ESP_LOGI(TAG, "Initializing MQTT");
+    mqtt_client = mqtt_init();
+
     ESP_LOGI(TAG, "Main App started successfully.");
 
 
     
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP_LOGI(TAG, "Main App is running...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGI(TAG, "Main App is running...\nPublishing message to MQTT topic");
+        mqtt_publish(mqtt_client, "example/topic", "Hello from ESP32!");
     }
 }
