@@ -94,6 +94,11 @@ menu "WiFi Configuration"
 endmenu
 
 menu "MQTT Configuration"
+    config MQTT_PUBLISH_INTERVAL
+        int "MQTT Publish Interval"
+        default 300
+        help
+            Interval in seconds to publish data to the MQTT broker.
 
     config MQTT_BROKER_URL
         string "MQTT Broker URL"
@@ -118,4 +123,22 @@ menu "MQTT Configuration"
         default "password"
         help
             Password for the MQTT broker.
+endmenu
+
+menu "Light Sensor Configuration"
+
+    config SENSOR_PIN_POLARITY
+            int "Light Sensor Pulse Polarity"
+            default 0
+            help
+                Set the pulse polarity for the light sensor.
+                If set to '1', the pulse is active high, set to '0' it is active low.
+
+    config SENSOR_INPUT_PIN
+        int "Light Sensor Input Pin"
+        default 15
+        help
+            GPIO pin number for the light sensor input.
+
+    
 endmenu

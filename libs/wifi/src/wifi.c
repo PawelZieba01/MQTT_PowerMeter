@@ -7,6 +7,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -56,6 +57,9 @@ static const char *TAG = "WiFi";
 
 static int s_retry_num = 0;
 
+static esp_event_handler_instance_t instance_any_id;
+static esp_event_handler_instance_t instance_got_ip;
+
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -91,8 +95,7 @@ void wifi_init_sta(void)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
+    
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
@@ -142,5 +145,36 @@ void wifi_init_sta(void)
                  ESP_WIFI_SSID, ESP_WIFI_PASS);
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    }
+}
+
+// Funkcja zatrzymująca WiFi
+void wifi_stop(void) {
+    esp_err_t err = esp_wifi_stop();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi stopped successfully.");
+    } else {
+        ESP_LOGE(TAG, "Failed to stop WiFi: %s", esp_err_to_name(err));
+    }
+}
+
+// Funkcja wznawiająca WiFi
+void wifi_start(void) {
+    esp_err_t err = esp_wifi_start();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi started successfully.");
+    } else {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(err));
+    }
+}
+
+bool wifi_is_connected(void) {
+    EventBits_t bits = xEventGroupGetBits(s_wifi_event_group);
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "WiFi is connected.");
+        return true;
+    } else {
+        ESP_LOGW(TAG, "WiFi is not connected.");
+        return false;
     }
 }
