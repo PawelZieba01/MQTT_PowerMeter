@@ -1,1 +1,4 @@
-1_0_4-debug
+Version v1_0_4-debug
+
+Add working light sensor
+Add turning on/off wifi and MQTT for power saving

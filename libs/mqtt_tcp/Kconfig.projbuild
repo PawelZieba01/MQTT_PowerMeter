@@ -1,0 +1,32 @@
+
+menu "MQTT Configuration"
+    config MQTT_PUBLISH_INTERVAL
+        int "MQTT Publish Interval"
+        default 300
+        help
+            Interval in seconds to publish data to the MQTT broker.
+
+    config MQTT_BROKER_URL
+        string "MQTT Broker URL"
+        default "127.0.0.1"
+        help
+            URL of the MQTT broker to connect to.
+
+    config MQTT_BROKER_PORT
+        int "MQTT Broker Port"
+        default 1883
+        help
+            Port of the MQTT broker to connect to.
+
+    config MQTT_BROKER_USERNAME
+        string "MQTT Broker Username"
+        default "username"
+        help
+            Username for the MQTT broker.
+
+    config MQTT_BROKER_PASSWORD
+        string "MQTT Broker Password"
+        default "password"
+        help
+            Password for the MQTT broker.
+endmenu

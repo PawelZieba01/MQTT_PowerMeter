@@ -1,0 +1,16 @@
+menu "Light Sensor Configuration"
+
+    config SENSOR_PIN_POLARITY
+            int "Light Sensor Pulse Polarity"
+            default 0
+            help
+                Set the pulse polarity for the light sensor.
+                If set to '1', the pulse is active high, set to '0' it is active low.
+
+    config SENSOR_INPUT_PIN
+        int "Light Sensor Input Pin"
+        default 10
+        help
+            GPIO pin number for the light sensor input.
+   
+endmenu

@@ -16,6 +16,7 @@
 #include "light_sensor.h"
 
 
+
 static const char *TAG = "main_app";
 
 static esp_mqtt_client_handle_t mqtt_client;
@@ -68,6 +69,7 @@ void app_main(void)
     // Main loop
     TickType_t xLastWakeTime = xTaskGetTickCount();
     while (1) {
+
         // Start WiFi connection
         wifi_start();
         while (wifi_is_connected() == false) {
@@ -92,7 +94,6 @@ void app_main(void)
         // Publish the pulse count to the MQTT topic
         uint8_t buffer[8];
         sprintf((char *)buffer, "%d", pulse_count);
-        ESP_LOGI(TAG, "Main App is running...\nPublishing message to MQTT topic");
         ESP_LOGI(TAG, "Captured impulses number = %d", pulse_count);
         mqtt_publish(mqtt_client, "example/topic", (const char *)buffer);
 

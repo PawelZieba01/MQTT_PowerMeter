@@ -1,0 +1,23 @@
+menu "OTA Configuration"
+
+    config FIRMWARE_UPG_URL
+        string "Firmware Upgrade URL"
+        default "https://192.168.0.104:8070/MQTT_PowerMeter.bin"
+        help
+            URL of server which hosts the firmware image.
+
+    config OTA_RECV_TIMEOUT
+        int "OTA Receive Timeout"
+        default 5000
+        help
+            Maximum time for reception
+
+    config OTA_UPDATE_SKIP
+        bool "Skip checking and downloading the OTA image"
+        default n
+        help
+           Skip checking and downloading the OTA image.
+           This is useful for testing the OTA update process.
+
+endmenu
+

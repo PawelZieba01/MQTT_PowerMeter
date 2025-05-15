@@ -10,5 +10,4 @@ idf_component_register(
         esp_system
         app_update
         driver
-        protocol_examples_common
     )

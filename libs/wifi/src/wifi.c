@@ -148,7 +148,7 @@ void wifi_init_sta(void)
     }
 }
 
-// Funkcja zatrzymująca WiFi
+
 void wifi_stop(void) {
     esp_err_t err = esp_wifi_stop();
     if (err == ESP_OK) {
@@ -158,7 +158,7 @@ void wifi_stop(void) {
     }
 }
 
-// Funkcja wznawiająca WiFi
+
 void wifi_start(void) {
     esp_err_t err = esp_wifi_start();
     if (err == ESP_OK) {
