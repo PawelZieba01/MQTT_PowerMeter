@@ -92,10 +92,23 @@ void app_main(void)
         light_sensor_reset_count(light_sensor);
 
         // Publish the pulse count to the MQTT topic
-        uint8_t buffer[8];
-        sprintf((char *)buffer, "%d", pulse_count);
+        uint8_t pulse_count_buf[8];
+        sprintf((char *)pulse_count_buf, "%d", pulse_count);
         ESP_LOGI(TAG, "Captured impulses number = %d", pulse_count);
-        mqtt_publish(mqtt_client, "example/topic", (const char *)buffer);
+
+        // Get the IP address as a string
+        char ip_str[16];
+        if (wifi_get_ip_str(ip_str, sizeof(ip_str))) {
+            ESP_LOGI(TAG, "IP as string: %s", ip_str);
+        }
+
+        // Prepare the MQTT topic
+        char topic[64] = CONFIG_PROJECT_MQTT_PUB_TOPIC;
+        strcat(topic, strrchr(ip_str, '.') + 1);
+        ESP_LOGI(TAG, "MQTT Topic: %s", topic);
+
+        // pUblish the pulse count to the MQTT topic
+        mqtt_publish(mqtt_client, topic, (const char *)pulse_count_buf);
 
         // Disconnect MQTT and stop WiFi
         ESP_LOGI(TAG, "Disconnecting MQTT in Loop");

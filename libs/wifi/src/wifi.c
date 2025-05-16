@@ -178,3 +178,15 @@ bool wifi_is_connected(void) {
         return false;
     }
 }
+
+bool wifi_get_ip_str(char *buf, size_t buflen) {
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+        snprintf(buf, buflen, IPSTR, IP2STR(&ip_info.ip));
+        return true;
+    } else {
+        if (buf && buflen > 0) buf[0] = '\0';
+        return false;
+    }
+}

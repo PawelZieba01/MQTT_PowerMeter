@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_attr.h"
+#include "esp_timer.h"
 
 
 static const char *TAG = "light_sensor";
@@ -12,8 +13,11 @@ static void IRAM_ATTR gpio_isr_handler(void *arg) {
     light_sensor_t *light_sensor = (light_sensor_t *)arg;
 
     uint16_t level = gpio_get_level(light_sensor->gpio_pin);
-    if (level == light_sensor->pulse_polarity) {
+    int64_t now = esp_timer_get_time(); // us
+
+    if (level == light_sensor->pulse_polarity && (now - light_sensor->last_pulse_time) >= 50000) {
         light_sensor->pulse_counter++;
+        light_sensor->last_pulse_time = now;
     }
 }
 
@@ -29,6 +33,7 @@ light_sensor_t * light_sensor_init() {
     light_sensor->pulse_polarity = CONFIG_SENSOR_PIN_POLARITY;
     light_sensor->gpio_pin = CONFIG_SENSOR_INPUT_PIN;
     light_sensor->pulse_counter = 0;
+    light_sensor->last_pulse_time = 0;
 
     // Configure GPIO
     gpio_config_t io_conf = {

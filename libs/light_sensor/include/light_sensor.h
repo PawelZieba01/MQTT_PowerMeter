@@ -7,6 +7,7 @@ typedef struct {
     uint16_t gpio_pin;
     uint16_t pulse_polarity;
     volatile uint16_t pulse_counter;
+    volatile int64_t last_pulse_time;
 } light_sensor_t;
 
 light_sensor_t * light_sensor_init();

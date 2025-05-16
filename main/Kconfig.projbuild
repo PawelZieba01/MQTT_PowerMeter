@@ -1,0 +1,10 @@
+menu "Project Configuration"
+    config PROJECT_MQTT_PUB_TOPIC
+        string "MQTT Topic"
+        default "mqtt/power_meter/"
+        help
+            MQTT topic to publish temperature data to.
+            At the end of this topic will be appended the device ip (last 3 digits).
+            For example: mqtt/power_meter/121
+
+endmenu
