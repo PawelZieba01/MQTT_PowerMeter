@@ -72,8 +72,15 @@ void app_main(void)
 
         // Start WiFi connection
         wifi_start();
+        uint8_t wifi_retries = 0;
         while (wifi_is_connected() == false) {
             ESP_LOGI(TAG, "Waiting for WiFi connection...");
+            wifi_retries++;
+            if (wifi_retries > 15) {
+                ESP_LOGE(TAG, "Failed to connect to WiFi after 10 attempts. Stopping WiFi.");
+                esp_restart();
+                break;
+            }
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
 
