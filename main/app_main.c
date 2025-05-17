@@ -87,8 +87,15 @@ void app_main(void)
         //Start MQTT connection 
         ESP_LOGI(TAG, "Starting MQTT connection in Loop");
         mqtt_connect(mqtt_client);
+        uint8_t mqtt_retries = 0;
         while(mqtt_is_connected(mqtt_client) == false) {
             ESP_LOGI(TAG, "Waiting for MQTT connection...");
+            mqtt_retries++;
+            if (mqtt_retries > 20) {
+                ESP_LOGE(TAG, "Failed to connect to MQTT after 10 attempts. Stopping WiFi.");
+                esp_restart();
+                break;
+            }
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
                 
