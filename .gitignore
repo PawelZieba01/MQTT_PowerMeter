@@ -1,8 +1,13 @@
 build/
 sdkconfig
 sdkconfig.old
+sdkconfig.ci
+sdkconfig.defaults
 dependencies.lock
 .vsvode
 *.code-workspace
 tests/__pycache__
 *.bin
+__pycache__/
+.vscode/
+.devcontainer/
